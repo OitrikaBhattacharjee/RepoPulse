@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RepoPulse — Predictive Architecture Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+:root{
+  --bg:#0B0E14; --panel:#12161F; --panel2:#161B26; --line:#232A38;
+  --text:#DCE3EE; --muted:#7C8797; --dim:#4B5567;
+  --accent:#2DD4BF; --accent-hover:#5EEAD4; --accent-dark:#042C29;
+  --import-c:#5B8DEF; --couple-c:#F472B6; --warn:#FBBF24; --good:#34D399;
+  --radius:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text); font-family:'JetBrains Mono',monospace; min-height:100vh;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:40px 24px 80px;}
+header{margin-bottom:28px;}
+.eyebrow{font-size:12px;letter-spacing:0.12em;color:var(--accent);text-transform:uppercase;margin-bottom:10px;}
+h1{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:34px;letter-spacing:-0.01em;line-height:1.15;}
+h1 span{color:var(--couple-c);}
+.lede{margin-top:12px;font-size:14px;color:var(--muted);max-width:70ch;line-height:1.6;}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px;}
+.panel + .panel{margin-top:18px;}
+
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+.field{flex:1;min-width:220px;}
+.field label{display:block;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.field input{
+  width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;
+  color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;padding:11px 12px;outline:none;
+}
+.field input:focus{border-color:var(--accent);}
+.field .hint{font-size:10.5px;color:var(--dim);margin-top:6px;}
+
+.btn{
+  font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;
+  background:var(--accent);color:var(--accent-dark);border:none;padding:12px 20px;
+  border-radius:5px;cursor:pointer;white-space:nowrap;
+}
+.btn:hover{background:var(--accent-hover);}
+.btn:disabled{opacity:0.5;cursor:default;}
+.btn-ghost{background:transparent;border:1px solid var(--line);color:var(--muted);}
+.btn-ghost:hover{color:var(--text);border-color:var(--accent);}
+
+.status{margin-top:14px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px;min-height:16px;}
+.spinner{width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:none;}
+.spinner.show{display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.error{color:#F87171;}
+
+.legend{display:flex;gap:22px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:4px;}
+.legend .sw{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:6px;}
+.legend .sw.dashed{border-top-style:dashed;}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px;}
+.stat{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:14px;}
+.stat .n{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;}
+.stat .l{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-top:2px;}
+
+.results{display:none;margin-top:18px;}
+.results.show{display:block;}
+.graph-layout{display:grid;grid-template-columns:1fr 320px;gap:16px;}
+@media (max-width:860px){.graph-layout{grid-template-columns:1fr;}}
+#graph{width:100%;height:520px;border-radius:var(--radius);}
+.node circle{stroke:var(--bg);stroke-width:2px;cursor:pointer;}
+.node text{font-family:'JetBrains Mono',monospace;font-size:9.5px;fill:var(--muted);pointer-events:none;}
+.node.selected circle{stroke:var(--warn);stroke-width:3px;}
+
+.side{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:18px;font-size:12.5px;overflow-y:auto;max-height:520px;}
+.side h3{font-family:'Space Grotesk',sans-serif;font-size:15px;margin-bottom:12px;word-break:break-all;}
+.side .sec{margin-bottom:16px;}
+.side .sec-title{font-size:10.5px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:8px;}
+.side .item{padding:6px 0;border-bottom:1px solid var(--line);color:var(--text);word-break:break-all;font-size:12px;}
+.side .item:last-child{border-bottom:none;}
+.side .item.risk{color:var(--couple-c);}
+.side .empty{color:var(--dim);font-size:11.5px;}
+.side .placeholder{color:var(--dim);font-size:12px;line-height:1.6;}
+
+.summary{margin-top:16px;}
+.summary h4{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;}
+.risk-row{
+  display:flex;justify-content:space-between;gap:12px;padding:10px 12px;
+  background:var(--panel2);border-left:3px solid var(--couple-c);border-radius:0 6px 6px 0;
+  margin-bottom:8px;font-size:12.5px;
+}
+.risk-row .paths{color:var(--text);}
+.risk-row .count{color:var(--couple-c);font-weight:600;white-space:nowrap;}
+.narrative{font-size:13px;line-height:1.7;color:var(--text);white-space:pre-wrap;}
+
+footer{margin-top:40px;font-size:11px;color:var(--dim);border-top:1px solid var(--line);padding-top:16px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">RepoPulse / predictive architecture intelligence</div>
+    <h1>See what's connected.<br>Find what's <span>secretly coupled.</span></h1>
+    <p class="lede">Paste a public GitHub repo. RepoPulse maps the real import graph, then mines commit history for files that change together even with no import between them — the hidden coupling that causes surprise breakage.</p>
+  </header>
+
+  <div class="panel">
+    <div class="row">
+      <div class="field">
+        <label for="repoInput">GitHub repo</label>
+        <input id="repoInput" type="text" placeholder="owner/repo or full github.com URL" value="" />
+        <div class="hint">e.g. expressjs/express, or facebook/react</div>
+      </div>
+      <div class="field">
+        <label for="ghToken">GitHub token (optional)</label>
+        <input id="ghToken" type="text" placeholder="raises rate limit, not required" />
+      </div>
+      <div class="field">
+        <label for="claudeKey">Claude API key (optional)</label>
+        <input id="claudeKey" type="text" placeholder="for AI-written risk summary" />
+      </div>
+      <button class="btn" id="analyzeBtn" onclick="analyze()">Analyze repo</button>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="legend">
+      <span><span class="sw" style="border-color:var(--import-c);"></span>import relationship</span>
+      <span><span class="sw dashed" style="border-color:var(--couple-c);"></span>hidden coupling (co-changes, no import)</span>
+    </div>
+  </div>
+
+  <div class="results" id="results">
+    <div class="stats" id="stats"></div>
+
+    <div class="panel" style="margin-top:16px;">
+      <div class="graph-layout">
+        <svg id="graph"></svg>
+        <div class="side" id="side">
+          <div class="placeholder">Click any node in the graph to see what it imports, what depends on it, and any hidden coupling risks.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel summary" id="summaryPanel" style="display:none;">
+      <h4>Architecture risk report</h4>
+      <div id="riskList"></div>
+      <div class="narrative" id="narrative"></div>
+    </div>
+  </div>
+
+  <footer>Built for the ML Empowerment Build Challenge 2.0. Analyzes up to 30 code files and the last 25 commits per repo to stay within public API rate limits — larger repos will show a partial graph.</footer>
+</div>
+
+<script>
+const CODE_EXT = ['.js','.jsx','.ts','.tsx','.py','.rb','.go','.java'];
+const SKIP_DIRS = ['node_modules/','dist/','build/','.git/','vendor/','__pycache__/','coverage/'];
+
+function parseRepoInput(raw){
+  let s = raw.trim();
+  s = s.replace(/^https?:\/\/github\.com\//,'').replace(/\.git$/,'').replace(/\/$/,'');
+  const parts = s.split('/').filter(Boolean);
+  if(parts.length < 2) return null;
+  return { owner: parts[0], repo: parts[1] };
+}
+
+async function ghFetch(url, token){
+  const headers = {'Accept':'application/vnd.github+json'};
+  if(token) headers['Authorization'] = 'token ' + token;
+  const res = await fetch(url, {headers});
+  if(!res.ok){
+    const body = await res.json().catch(()=>({}));
+    throw new Error((body.message || res.statusText) + ' (' + res.status + ')');
+  }
+  return res.json();
+}
+
+function setStatus(msg, isError){
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status' + (isError ? ' error' : '');
+}
+
+function resolveRelative(fromPath, importPath){
+  const fromDir = fromPath.split('/').slice(0,-1);
+  const parts = importPath.split('/');
+  let stack = [...fromDir];
+  for(const p of parts){
+    if(p === '.' || p === '') continue;
+    if(p === '..') stack.pop();
+    else stack.push(p);
+  }
+  return stack.join('/');
+}
+
+function extractImports(content, filePath){
+  const found = [];
+  const isPy = filePath.endsWith('.py');
+  if(!isPy){
+    const importRe = /import\s+(?:[^'";]*\s+from\s+)?['"]([^'"]+)['"]/g;
+    const requireRe = /require\(\s*['"]([^'"]+)['"]\s*\)/g;
+    let m;
+    while((m = importRe.exec(content))) if(m[1].startsWith('.')) found.push(m[1]);
+    while((m = requireRe.exec(content))) if(m[1].startsWith('.')) found.push(m[1]);
+  } else {
+    const fromRe = /^\s*from\s+(\.[.\w]*)\s+import/gm;
+    let m;
+    while((m = fromRe.exec(content))){
+      const rel = m[1].replace(/^\.+/, match => '.'.repeat(match.length));
+      found.push(rel.replace(/\./g,'/').replace(/^\/*/,'./'));
+    }
+  }
+  return found;
+}
+
+function resolveToFile(fromPath, importPath, fileSet){
+  const base = resolveRelative(fromPath, importPath);
+  const idx = p => p ? p + '/index' : 'index';
+  const withExt = p => [p, p+'.js', p+'.jsx', p+'.ts', p+'.tsx', p+'.py'];
+  const candidates = [...withExt(base), ...withExt(idx(base))];
+  for(const c of candidates) if(fileSet.has(c)) return c;
+  return null;
+}
+
+let state = { files:[], importEdges:[], hiddenCouples:[], selected:null, simulation:null };
+
+async function analyze(){
+  const btn = document.getElementById('analyzeBtn');
+  const spinner = null;
+  btn.disabled = true;
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('summaryPanel').style.display = 'none';
+
+  const parsed = parseRepoInput(document.getElementById('repoInput').value);
+  if(!parsed){ setStatus('Enter a repo like owner/repo', true); btn.disabled=false; return; }
+  const { owner, repo } = parsed;
+  const ghToken = document.getElementById('ghToken').value.trim();
+
+  try{
+    setStatus('Fetching repo info…');
+    const repoInfo = await ghFetch(`https://api.github.com/repos/${owner}/${repo}`, ghToken);
+    const branch = repoInfo.default_branch;
+
+    setStatus('Reading file tree…');
+    const treeData = await ghFetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`, ghToken);
+    const DEPRIORITIZE = ['examples/','example/','test/','tests/','docs/','demo/','fixtures/'];
+    function priority(path){
+      let score = 0;
+      if(DEPRIORITIZE.some(d => path.includes(d))) score += 100;
+      if(path.includes('src/') || path.includes('lib/')) score -= 50;
+      score += (path.match(/\//g)||[]).length;
+      return score;
+    }
+    let files = (treeData.tree || [])
+      .filter(t => t.type === 'blob')
+      .filter(t => CODE_EXT.some(ext => t.path.endsWith(ext)))
+      .filter(t => !SKIP_DIRS.some(d => t.path.includes(d)))
+      .map(t => t.path)
+      .sort((a,b) => priority(a)-priority(b) || a.localeCompare(b));
+    if(files.length === 0) throw new Error('No recognizable code files found in this repo.');
+    files = files.slice(0, 30);
+    const fileSet = new Set(files);
+
+    setStatus(`Reading contents of ${files.length} files…`);
+    const contents = await Promise.all(files.map(async p => {
+      try{
+        const res = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${p}`);
+        if(!res.ok) return '';
+        return await res.text();
+      }catch(e){ return ''; }
+    }));
+
+    const importEdges = [];
+    files.forEach((path, i) => {
+      const imports = extractImports(contents[i] || '', path);
+      imports.forEach(imp => {
+        const target = resolveToFile(path, imp, fileSet);
+        if(target && target !== path) importEdges.push({source: path, target});
+      });
+    });
+
+    setStatus('Scanning commit history for hidden coupling…');
+    const commitList = await ghFetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=25`, ghToken);
+    const commitDetails = await Promise.all(commitList.slice(0,25).map(async c => {
+      try{ return await ghFetch(`https://api.github.com/repos/${owner}/${repo}/commits/${c.sha}`, ghToken); }
+      catch(e){ return null; }
+    }));
+
+    const coChange = {};
+    let commitsScanned = 0;
+    commitDetails.forEach(cd => {
+      if(!cd || !cd.files) return;
+      commitsScanned++;
+      const touched = cd.files.map(f => f.filename).filter(f => fileSet.has(f));
+      for(let a=0; a<touched.length; a++){
+        for(let b=a+1; b<touched.length; b++){
+          const key = [touched[a], touched[b]].sort().join('|');
+          coChange[key] = (coChange[key] || 0) + 1;
+        }
+      }
+    });
+
+    const importSet = new Set(importEdges.map(e => e.source+'>'+e.target).concat(importEdges.map(e=>e.target+'>'+e.source)));
+    const hiddenCouples = Object.entries(coChange)
+      .filter(([key,count]) => count >= 2)
+      .map(([key,count]) => {
+        const [a,b] = key.split('|');
+        return {a,b,count, hasImport: importSet.has(a+'>'+b)};
+      })
+      .filter(hc => !hc.hasImport)
+      .sort((x,y) => y.count - x.count)
+      .slice(0, 20);
+
+    state = { files, importEdges, hiddenCouples, selected:null };
+
+    renderStats(files.length, importEdges.length, hiddenCouples.length, commitsScanned);
+    renderGraph(files, importEdges, hiddenCouples);
+    renderSummary(hiddenCouples);
+
+    const claudeKey = document.getElementById('claudeKey').value.trim();
+    if(claudeKey) generateNarrative(owner, repo, hiddenCouples, claudeKey);
+    else renderTemplatedNarrative(hiddenCouples);
+
+    document.getElementById('results').classList.add('show');
+    setStatus(`Done — analyzed ${files.length} files and ${commitsScanned} commits.`);
+  } catch(e){
+    setStatus('Error: ' + e.message + '. If this is a rate limit, add a GitHub token above.', true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderStats(nFiles, nImports, nHidden, nCommits){
+  const stats = [
+    {n: nFiles, l:'Files analyzed'},
+    {n: nImports, l:'Import edges'},
+    {n: nHidden, l:'Hidden couplings'},
+    {n: nCommits, l:'Commits scanned'}
+  ];
+  document.getElementById('stats').innerHTML = stats.map(s =>
+    `<div class="stat"><div class="n">${s.n}</div><div class="l">${s.l}</div></div>`).join('');
+}
+
+function renderGraph(files, importEdges, hiddenCouples){
+  const svg = d3.select('#graph');
+  svg.selectAll('*').remove();
+  const width = document.getElementById('graph').clientWidth || 700;
+  const height = 520;
+  svg.attr('viewBox', `0 0 ${width} ${height}`);
+
+  const nodes = files.map(f => ({id:f, name: f.split('/').pop()}));
+  const links = [
+    ...importEdges.map(e => ({source:e.source, target:e.target, type:'import'})),
+    ...hiddenCouples.map(h => ({source:h.a, target:h.b, type:'hidden', count:h.count}))
+  ];
+
+  const sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d=>d.id).distance(l => l.type==='hidden'?110:70).strength(0.5))
+    .force('charge', d3.forceManyBody().strength(-160))
+    .force('center', d3.forceCenter(width/2, height/2))
+    .force('collide', d3.forceCollide(22));
+
+  const link = svg.append('g').selectAll('line').data(links).join('line')
+    .attr('stroke', d => d.type==='hidden' ? 'var(--couple-c)' : 'var(--import-c)')
+    .attr('stroke-width', d => d.type==='hidden' ? Math.min(1+d.count,4) : 1.4)
+    .attr('stroke-dasharray', d => d.type==='hidden' ? '5,4' : null)
+    .attr('opacity', 0.65);
+
+  const node = svg.append('g').selectAll('g').data(nodes).join('g')
+    .attr('class','node')
+    .attr('id', d => 'n-'+d.id.replace(/[^\w]/g,'_'))
+    .call(d3.drag()
+      .on('start', (ev,d)=>{ if(!ev.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
+      .on('drag', (ev,d)=>{ d.fx=ev.x; d.fy=ev.y; })
+      .on('end', (ev,d)=>{ if(!ev.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }))
+    .on('click', (ev,d) => selectNode(d.id));
+
+  node.append('circle').attr('r', 9).attr('fill', 'var(--import-c)');
+  node.append('text').text(d=>d.name).attr('x', 12).attr('y', 4);
+
+  sim.on('tick', () => {
+    link.attr('x1', d=>d.source.x).attr('y1', d=>d.source.y)
+        .attr('x2', d=>d.target.x).attr('y2', d=>d.target.y);
+    node.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+
+  state.simulation = sim;
+}
+
+function selectNode(path){
+  state.selected = path;
+  document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+  const el = document.getElementById('n-'+path.replace(/[^\w]/g,'_'));
+  if(el) el.classList.add('selected');
+
+  const imports = state.importEdges.filter(e => e.source === path).map(e => e.target);
+  const importedBy = state.importEdges.filter(e => e.target === path).map(e => e.source);
+  const coupled = state.hiddenCouples.filter(h => h.a === path || h.b === path)
+    .map(h => ({ path: h.a===path ? h.b : h.a, count: h.count }));
+
+  const side = document.getElementById('side');
+  side.innerHTML = `
+    <h3>${path}</h3>
+    <div class="sec">
+      <div class="sec-title">Imports (${imports.length})</div>
+      ${imports.length ? imports.map(i=>`<div class="item">${i}</div>`).join('') : '<div class="empty">none detected</div>'}
+    </div>
+    <div class="sec">
+      <div class="sec-title">Imported by (${importedBy.length})</div>
+      ${importedBy.length ? importedBy.map(i=>`<div class="item">${i}</div>`).join('') : '<div class="empty">nothing depends on this</div>'}
+    </div>
+    <div class="sec">
+      <div class="sec-title">Changes with, no import link (${coupled.length})</div>
+      ${coupled.length ? coupled.map(c=>`<div class="item risk">${c.path} — co-changed ${c.count}×</div>`).join('') : '<div class="empty">no hidden coupling found</div>'}
+    </div>
+  `;
+}
+
+function renderSummary(hiddenCouples){
+  const panel = document.getElementById('summaryPanel');
+  const list = document.getElementById('riskList');
+  if(hiddenCouples.length === 0){
+    list.innerHTML = '<div class="empty" style="color:var(--muted);">No hidden coupling detected in the scanned commit window.</div>';
+  } else {
+    list.innerHTML = hiddenCouples.slice(0,8).map(h => `
+      <div class="risk-row">
+        <span class="paths">${h.a} ↔ ${h.b}</span>
+        <span class="count">${h.count}× together</span>
+      </div>`).join('');
+  }
+  panel.style.display = 'block';
+}
+
+function renderTemplatedNarrative(hiddenCouples){
+  const el = document.getElementById('narrative');
+  if(hiddenCouples.length === 0){
+    el.textContent = 'No files changed together often enough (without a direct import) to flag as hidden coupling in the commits scanned. That\'s a good sign — it suggests the visible import graph reflects most of the real change risk in this codebase.';
+    return;
+  }
+  const top = hiddenCouples[0];
+  el.textContent = `${hiddenCouples.length} file pair(s) show hidden coupling — they change together repeatedly but have no direct import relationship. The strongest case is ${top.a} and ${top.b}, co-changed in ${top.count} of the scanned commits. This usually means a shared assumption, a duplicated constant, or a test that silently covers both — worth checking before editing either file alone.`;
+}
+
+async function generateNarrative(owner, repo, hiddenCouples, key){
+  const el = document.getElementById('narrative');
+  el.textContent = 'Generating AI risk summary…';
+  const pairsText = hiddenCouples.slice(0,10).map(h => `${h.a} <-> ${h.b} (co-changed ${h.count}x, no import link)`).join('\n');
+  const prompt = `You are a senior software architect reviewing the repo ${owner}/${repo}. Here are file pairs that change together in commit history but have no direct import relationship between them (hidden coupling):\n\n${pairsText || 'None found.'}\n\nWrite a short (4-6 sentence) plain-English risk report for a developer about to modify this codebase. Mention the most concerning pair specifically if any exist, speculate briefly on why they might be coupled, and give one practical recommendation. No markdown, no headers, just prose.`;
+  try{
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-6',
+        max_tokens: 500,
+        messages:[{role:'user', content: prompt}]
+      })
+    });
+    const data = await res.json();
+    const text = (data.content || []).map(c => c.text || '').join('');
+    el.textContent = text || 'AI summary unavailable — showing detected pairs above instead.';
+  }catch(e){
+    renderTemplatedNarrative(hiddenCouples);
+  }
+}
+</script>
+</body>
+</html>
